@@ -84,18 +84,18 @@ class WabaseSwaggerGenerator(
     swagger
   }
 
-  lazy val viewNameToQe: Map[String,Querease] = qes.flatMap { qe =>
+  lazy val viewNameToQe = qes.flatMap { qe =>
     qe.nameToViewDef.map { case (n, v) => (n, qe) }
   }.toMap
 
-  lazy val viewdefs: Seq[ViewDef] =
+  lazy val viewdefs =
     qes.flatMap { qe =>
       dropIrrelevant(qe, qe.nameToViewDef.values.toList)
     }
-  lazy val viewDefMap: Map[String,ViewDef] = viewdefs.map(v => v.name -> v).toMap
+  lazy val viewDefMap = viewdefs.map(v => v.name -> v).toMap
 
   // https://swagger.io/docs/specification/data-models/data-types/
-  def schemaFromType(type_ : org.mojoz.metadata.Type): Schema[_ <: Object] = type_.name match {
+  def schemaFromType(type_ : org.mojoz.metadata.Type) = type_.name match {
     case n if type_.isComplexType =>
       (new Schema).$ref(refFromViewName(n))
     case "long" => (new IntegerSchema).format("int64")
@@ -127,14 +127,14 @@ class WabaseSwaggerGenerator(
 
   def getReadOnly(viewdefs: Map[String, ViewDef])(field: FieldDef): Boolean = {
     if (!field.api.updatable && !field.api.insertable) true
-    else if (field.type_.isComplexType) viewdefs.get(field.type_.name).exists(_.saveTo == Nil)
+    else if (field.type_.isComplexType) viewdefs.get(field.type_.name).exists(_.saveTo.isEmpty)
     else false
   }
 
-  def fieldRequired(viewdefs: Map[String, ViewDef])(field: FieldDef): Boolean =
+  def fieldRequired(viewdefs: Map[String, ViewDef])(field: FieldDef) =
     !getReadOnly(viewdefs)(field) && (field.required || !field.nullable)
 
-  def addEnumIfNeeded(enums: Seq[String], schema: Schema[_]): Schema[_] = {
+  def addEnumIfNeeded(enums: Seq[String], schema: Schema[_]) = {
     (enums, schema) match {
       case (enums, stringSchema: StringSchema) if enums != null => enums.foreach(stringSchema.addEnumItem)
       case _ =>
@@ -189,8 +189,8 @@ class WabaseSwaggerGenerator(
   }
 
   val schemaRefPrefix = "#/components/schemas/"
-  def refFromViewName(viewName: String): String = s"${schemaRefPrefix}${viewName}"
-  def viewNameFromRef(ref: String): String = if (ref.startsWith(schemaRefPrefix)) ref.substring(schemaRefPrefix.length) else ref
+  def refFromViewName(viewName: String) = s"${schemaRefPrefix}${viewName}"
+  def viewNameFromRef(ref: String) = if (ref.startsWith(schemaRefPrefix)) ref.substring(schemaRefPrefix.length) else ref
 
   def fileContent(view: String): Content = {
     val content = new Content
@@ -241,7 +241,7 @@ class WabaseSwaggerGenerator(
     content.addMediaType("text/plain", mediaType)
   }
 
-  def responseContent(view: String, array: Boolean = false): Content =
+  def responseContent(view: String, array: Boolean = false) =
     jsonContent(view, array)
 
   def createOperation(summary: String, description: String): Operation =
@@ -403,13 +403,13 @@ class WabaseSwaggerGenerator(
     op
   }
 
-  def addBadRequestResponse(op: Operation): Operation     = addErrorResponse(op, "400")
-  def addForbiddenResponse(op: Operation, viewDef: ViewDef): Operation = addErrorResponse(op, "403")
-  def addNotFoundResponse(op: Operation): Operation       = addErrorResponse(op, "404")
-  def addInternalServerError(op: Operation): Operation    = addErrorResponse(op, "500")
-  def addServiceUnavailabeError(op: Operation): Operation = addErrorResponse(op, "503")
+  def addBadRequestResponse(op: Operation)     = addErrorResponse(op, "400")
+  def addForbiddenResponse(op: Operation, viewDef: ViewDef) = addErrorResponse(op, "403")
+  def addNotFoundResponse(op: Operation)       = addErrorResponse(op, "404")
+  def addInternalServerError(op: Operation)    = addErrorResponse(op, "500")
+  def addServiceUnavailabeError(op: Operation) = addErrorResponse(op, "503")
 
-  def hasApiFields(view: String): Boolean =
+  def hasApiFields(view: String) =
     viewDefMap.get(view).exists(_.fields.exists(isApiField))
 
   def addRequestBody(op: Operation, view: String, array: Boolean = false): Operation = {
@@ -429,20 +429,20 @@ class WabaseSwaggerGenerator(
   }
 
   implicit class RichOperation(val op: Operation) {
-    val delegate: WabaseSwaggerGenerator = WabaseSwaggerGenerator.this
-    def addBadRequestResponse: Operation = delegate.addBadRequestResponse(op)
+    val delegate = WabaseSwaggerGenerator.this
+    def addBadRequestResponse = delegate.addBadRequestResponse(op)
     def addCookieParameters(method: String, viewDef: ViewDef, keySize: Int = 99): Operation =
           delegate.addCookieParameters(op, method, viewDef, keySize)
     def addErrorResponse(code: String, description: String, content: Content = null): Operation =
           delegate.addErrorResponse(op, code, description, content)
     def addFileRequestBody(view: String): Operation = delegate.addFileRequestBody(op, view)
-    def addForbiddenResponse(viewDef: ViewDef): Operation = delegate.addForbiddenResponse(op, viewDef)
+    def addForbiddenResponse(viewDef: ViewDef) = delegate.addForbiddenResponse(op, viewDef)
     def addHeaderParameters(method: String, viewDef: ViewDef, keySize: Int = 99): Operation =
           delegate.addHeaderParameters(op, method, viewDef, keySize)
     def addIntegerResponse(description: String, code: String = "200"): Operation =
           delegate.addIntegerResponse(op, description, code)
-    def addInternalServerError: Operation = delegate.addInternalServerError(op)
-    def addNotFoundResponse: Operation  = delegate.addNotFoundResponse(op)
+    def addInternalServerError = delegate.addInternalServerError(op)
+    def addNotFoundResponse  = delegate.addNotFoundResponse(op)
     def addParameters(method: String, viewDef: ViewDef, keySize: Int = 99): Operation =
           delegate.addParameters(op, method, viewDef, keySize)
     def addPathParameter(field: FieldDef): Operation =
@@ -460,7 +460,7 @@ class WabaseSwaggerGenerator(
     def addQueryParameters(method: String, viewDef: ViewDef, keySize: Int = 99): Operation =
           delegate.addQueryParameters(op, method, viewDef, keySize)
     def addRequestBody(view: String, array: Boolean = false): Operation = delegate.addRequestBody(op, view, array)
-    def addServiceUnavailabeError: Operation = delegate.addServiceUnavailabeError(op)
+    def addServiceUnavailabeError = delegate.addServiceUnavailabeError(op)
     def addSuccessPlaintextResponse(view: String, code: String = "200"): Operation =
           delegate.addSuccessPlaintextResponse(op, view, code)
     def addSuccessResponse(view: String, code: String = "200", array: Boolean = false): Operation =
@@ -472,15 +472,14 @@ class WabaseSwaggerGenerator(
 
   def getErrorCodesForView(viewDef: ViewDef, action: String): List[String] = {
     val steps = viewDef.actions.get(action).map(_.steps).getOrElse(Nil)
-    val res = steps.flatMap {
+    steps.flatMap {
       case (Validations(Some(name), _, _), _) => List(name)
       case (Evaluation(_, _, ViewCall(method, view, _, _), _), _) if view != viewDef.name =>
-        viewNameToQe(view).nameToViewDef.get(view).map(subView =>
+        Option(viewNameToQe(view)).flatMap(_.nameToViewDef.get(view)).map(subView =>
           getErrorCodesForView(subView, method)
         ).getOrElse(Nil)
       case _ => Nil
     }
-    res
   }
 
   def keyDescription(viewDef: ViewDef, keySize: Int = 99): String = {
@@ -505,9 +504,9 @@ class WabaseSwaggerGenerator(
     }
   }
 
-  def rootPathForView(viewDef: ViewDef): String = s"/${viewDef.name}"
+  def rootPathForView(viewDef: ViewDef) = s"/${viewDef.name}"
 
-  def pathWithKey(method: String, viewDef: ViewDef, keySize: Int = 99): String = {
+  def pathWithKey(method: String, viewDef: ViewDef, keySize: Int = 99) = {
     val infix = method match {
       case "create" => s":$method"
       case "count"  => s":$method"
@@ -737,76 +736,149 @@ class WabaseSwaggerGenerator(
   }
 
   def collectRefs(pathItem: PathItem): Set[String] = {
-    val refs = mutable.Set[String]()
-    extractRefs(pathItem, refs)
+    val refs = mutable.Set.empty[String]
+    val visited = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap[AnyRef, java.lang.Boolean]())
+    extractRefs(pathItem, refs, visited)
     refs.toSet
   }
 
-  private def extractRefs(obj: Any, refs: mutable.Set[String]): Unit = {
+  private def extractRefs(obj: Any, refs: mutable.Set[String], visited: java.util.Set[AnyRef]): Unit = {
     if (obj == null) return
+    val refObj = obj.asInstanceOf[AnyRef]
+    if (visited.contains(refObj)) return
+    visited.add(refObj)
+
+    def addRef(ref: String): Unit = {
+      val prefix = "#/components/schemas/"
+
+      Option(ref).filter(r => refs.add(r)).filter(_.startsWith(prefix)).map(_.substring(prefix.length)).foreach {
+        name =>
+          components
+            .flatMap(c => Option(c.getSchemas))
+            .flatMap(schemas => Option(schemas.get(name)))
+            .foreach(schema => extractRefs(schema, refs, visited))
+        }
+    }
+
+    def extractDiscriminatorRefs(schema: Schema[_], refs: mutable.Set[String]): Unit = {
+      val discriminator = schema.getDiscriminator
+      if (discriminator != null && discriminator.getMapping != null) {
+        discriminator.getMapping.values().forEach { ref =>
+          addRef(ref)
+        }
+      }
+    }
+
+    def extractAll(xs: Iterable[_], refs: mutable.Set[String], visited: java.util.Set[AnyRef]): Unit = {
+      Option(xs).getOrElse(Iterable.empty).filter(_ != null).foreach(x => extractRefs(x, refs, visited))
+    }
+
+
+    def extractAllList( xs: java.util.List[_], refs: mutable.Set[String], visited: java.util.Set[AnyRef]): Unit = {
+      Option(xs).map(_.asScala).getOrElse(Seq.empty).filter(_ != null).foreach(x => extractRefs(x, refs, visited))
+    }
+
+    def extractAllMapValues(m: java.util.Map[_, _], refs: mutable.Set[String], visited: java.util.Set[AnyRef]): Unit = {
+      Option(m).map(_.values().asScala).getOrElse(Seq.empty).filter(_ != null).foreach { x =>
+          //println(s"Traversing map value of type: ${x.getClass.getSimpleName}")
+          extractRefs(x, refs, visited)
+        }
+    }
+
+    def extractAllNullable(xs: Iterable[Any], refs: mutable.Set[String], visited: java.util.Set[AnyRef]): Unit = {
+      xs.iterator.foreach(x => extractRefs(x, refs, visited))
+    }
+
+    def extractEncodingHeaderSchemas(encoding: Encoding, refs: mutable.Set[String], visited: java.util.Set[AnyRef]): Unit = {
+      Option(encoding.getHeaders).map(_.values().asScala).getOrElse(Seq.empty).filter(_ != null).foreach { header =>
+          addRef(header.get$ref)
+          extractRefs(header.getSchema, refs, visited)
+        }
+    }
+
     obj match {
       case p: PathItem =>
-        if (p.get$ref != null) refs += p.get$ref
-        if (p.getParameters != null) p.getParameters.asScala.foreach(extractRefs(_, refs))
-        if (p.getServers != null) p.getServers.asScala.foreach(extractRefs(_, refs))
-        extractRefs(p.getGet, refs)
-        extractRefs(p.getPost, refs)
-        extractRefs(p.getPut, refs)
-        extractRefs(p.getDelete, refs)
-        extractRefs(p.getOptions, refs)
-        extractRefs(p.getHead, refs)
-        extractRefs(p.getPatch, refs)
-        extractRefs(p.getTrace, refs)
+        addRef(p.get$ref)
+        extractAllList(p.getParameters, refs, visited)
+        extractAllList(p.getServers, refs, visited)
+        extractAllNullable(List(
+          p.getGet, p.getPost, p.getPut, p.getDelete,
+          p.getOptions, p.getHead, p.getPatch, p.getTrace
+        ), refs, visited)
+
       case o: Operation =>
-        if (o.getParameters != null) o.getParameters.asScala.foreach(extractRefs(_, refs))
-        extractRefs(o.getRequestBody, refs)
-        extractRefs(o.getResponses, refs)
-        if (o.getCallbacks != null) o.getCallbacks.values.asScala.foreach(extractRefs(_, refs))
-        if (o.getServers != null) o.getServers.asScala.foreach(extractRefs(_, refs))
+        extractAllList(o.getParameters, refs, visited)
+        extractRefs(o.getRequestBody, refs, visited)
+        extractRefs(o.getResponses, refs, visited)
+        extractAllMapValues(o.getCallbacks, refs, visited)
+        extractAllList(o.getServers, refs, visited)
+
       case param: Parameter =>
-        if (param.get$ref != null) refs += param.get$ref
-        extractRefs(param.getSchema, refs)
-        extractRefs(param.getContent, refs)
+        addRef(param.get$ref)
+        extractRefs(param.getSchema, refs, visited)
+        extractRefs(param.getContent, refs, visited)
+
       case rb: RequestBody =>
-        if (rb.get$ref != null) refs += rb.get$ref
-        extractRefs(rb.getContent, refs)
+        addRef(rb.get$ref)
+        extractRefs(rb.getContent, refs, visited)
+
       case responses: ApiResponses =>
-        if (responses != null) responses.values.asScala.foreach(extractRefs(_, refs))
+        extractAll(responses.values().asScala, refs, visited)
+
       case response: ApiResponse =>
-        if (response.get$ref != null) refs += response.get$ref
-        extractRefs(response.getContent, refs)
-        if (response.getHeaders != null) response.getHeaders.values.asScala.foreach(extractRefs(_, refs))
-        if (response.getLinks != null) response.getLinks.values.asScala.foreach(extractRefs(_, refs))
+        addRef(response.get$ref)
+        extractRefs(response.getContent, refs, visited)
+        extractAllMapValues(response.getHeaders, refs, visited)
+        extractAllMapValues(response.getLinks, refs, visited)
+
       case content: Content =>
-        if (content != null) content.values.asScala.foreach(extractRefs(_, refs))
-      case mt: io.swagger.v3.oas.models.media.MediaType =>
-        extractRefs(mt.getSchema, refs)
-        if (mt.getExamples != null) mt.getExamples.values.asScala.foreach(extractRefs(_, refs))
-        if (mt.getEncoding != null) mt.getEncoding.values.asScala.foreach(extractRefs(_, refs))
+        extractAll(content.values().asScala, refs, visited)
+
+      case mt: MediaType =>
+        extractRefs(mt.getSchema, refs, visited)
+        extractAllMapValues(mt.getExamples, refs, visited)
+        extractAllMapValues(mt.getEncoding, refs, visited)
+
       case schema: Schema[_] =>
-        if (schema.get$ref != null) refs += schema.get$ref
-        extractRefs(schema.getNot, refs)
-        if (schema.getProperties != null) schema.getProperties.values.asScala.foreach(extractRefs(_, refs))
-        extractRefs(schema.getAdditionalProperties, refs)
-        extractRefs(schema.getItems, refs)
-        if (schema.getAllOf != null) schema.getAllOf.asScala.foreach(extractRefs(_, refs))
-        if (schema.getAnyOf != null) schema.getAnyOf.asScala.foreach(extractRefs(_, refs))
-        if (schema.getOneOf != null) schema.getOneOf.asScala.foreach(extractRefs(_, refs))
+        extractDiscriminatorRefs(schema, refs)
+        //println(s"Visiting schema with ref: ${schema.get$ref}")
+        addRef(schema.get$ref)
+        if (schema.getProperties != null) {
+         //println(s"Schema has properties: ${schema.getProperties.keySet}")
+        }
+        extractRefs(schema.getNot, refs, visited)
+        extractAllMapValues(schema.getProperties, refs, visited)
+        extractRefs(schema.getAdditionalProperties, refs, visited)
+        extractRefs(schema.getItems, refs, visited)
+        extractAllList(schema.getAllOf, refs, visited)
+        extractAllList(schema.getAnyOf, refs, visited)
+        extractAllList(schema.getOneOf, refs, visited)
+
       case header: Header =>
-        if (header.get$ref != null) refs += header.get$ref
-        extractRefs(header.getSchema, refs)
-        extractRefs(header.getContent, refs)
+        addRef(header.get$ref)
+        extractRefs(header.getSchema, refs, visited)
+        extractRefs(header.getContent, refs, visited)
+
       case link: Link =>
-        if (link.get$ref != null) refs += link.get$ref
+        addRef(link.get$ref)
+        addRef(link.getOperationRef)
+
+      case encoding: Encoding =>
+        extractEncodingHeaderSchemas(encoding, refs, visited)
+
       case example: Example =>
-        if (example.get$ref != null) refs += example.get$ref
+        addRef(example.get$ref)
+
       case callback: Callback =>
-        callback.values.asScala.foreach(extractRefs(_, refs))
-      case l: JList[_] =>
-        l.asScala.foreach(extractRefs(_, refs))
-      case m: JMap[_, _] =>
-        m.values.asScala.foreach(extractRefs(_, refs))
-      case _ => // ignore
+        extractAll(callback.values().asScala, refs, visited)
+
+      case l: java.util.List[_] =>
+        extractAllList(l, refs, visited)
+
+      case m: java.util.Map[_, _] =>
+        extractAllMapValues(m, refs, visited)
+
+      case _ =>
     }
   }
 
@@ -871,7 +943,7 @@ class WabaseSwaggerGenerator(
     val refs = pathNamesAndItems.map(_._2).flatMap(collectRefs).toSet
     val viewNamesFromRefs = refs.map(viewNameFromRef)
     val referencedViews = viewNamesFromRefs.flatMap { v =>
-      qes.map(_.nameToViewDef.get(v)).filter(_.nonEmpty).headOption.map(_.get).toSeq
+      qes.view.flatMap(_.nameToViewDef.get(v)).headOption.toSeq
     }
     schemasFromViewDefs(viewDefMap ++ referencedViews.map { v => v.name -> v}).toSeq.sortBy(_._1).foreach { i =>
       components.addSchemas(i._1, i._2)
@@ -903,4 +975,6 @@ class WabaseSwaggerGenerator(
       }
     }
   }
+
+
 }
