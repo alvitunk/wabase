@@ -1,7 +1,8 @@
 package org.wabase
 
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.http.scaladsl.client.RequestBuilding.{Get, Post, Put}
+import org.apache.pekko.http.scaladsl.client.RequestBuilding
+import org.apache.pekko.http.scaladsl.client.RequestBuilding.{Get, Head, Options, Post, Put}
 import org.apache.pekko.http.scaladsl.model.headers.{BasicHttpCredentials, Cookie, HttpCookiePair, `Set-Cookie`}
 import org.apache.pekko.http.scaladsl.model.{HttpEntity, HttpMessage, HttpMethod, HttpMethods, HttpRequest, HttpResponse, RequestEntity, StatusCodes, Uri}
 import org.apache.pekko.util.ByteString
@@ -65,36 +66,35 @@ class WabaseServiceSpecs extends AnyFlatSpec with Matchers {
   }
 
   it should "do http method dependant routes" in {
-    callRoute("/method-dependent-path", method = HttpMethods.GET) shouldBe "Http method with path match: GET /method-dependent-path"
-    callRoute("/method-dependent-path", method = HttpMethods.POST) shouldBe "Http method with path match: POST /method-dependent-path"
-    callRoute("/method-dependent-path", method = HttpMethods.PUT) shouldBe "Http method with path match: PUT /method-dependent-path"
-    callRoute("/method-dependent-path", method = HttpMethods.DELETE) shouldBe "DELETE /method-dependent-path"
-    callRoute("/method-dependent-path", method = HttpMethods.HEAD) shouldBe "HEAD /method-dependent-path"
-    callRoute("/method-dependent-path", method = HttpMethods.OPTIONS) shouldBe "OPTIONS /method-dependent-path"
-    callRoute("/decoded-map-entity", data = encodeJs(Map("a" -> 1, "b" -> "x", "c" -> List(1,2,3))),
-      method = HttpMethods.POST, decoder = decodeJs) shouldBe Map("a" -> 1, "b" -> "x", "c" -> List(1, 2, 3))
-    callRoute("/decoded-seq-entity", data = encodeJs(List(Map("a" -> 1), 2, true, "x", List(1, "y"))),
-      method = HttpMethods.PUT, decoder = decodeJs) shouldBe List(Map("a" -> 1), 2, true, "x", List(1, "y"))
-    callRoute("/decoded-string-entity", data = HttpEntity("content"), method = HttpMethods.PUT) shouldBe "content"
-    callRoute("/decoded-dto-entity", data = encodeJs(Map("id" -> 1, "name" -> "View1")),
-      method = HttpMethods.POST) shouldBe "1:View1"
+    entityForRequest(Get("/method-dependent-path")) shouldBe "Http method with path match: GET /method-dependent-path"
+    entityForRequest(Post("/method-dependent-path")) shouldBe "Http method with path match: POST /method-dependent-path"
+    entityForRequest(Put("/method-dependent-path")) shouldBe "Http method with path match: PUT /method-dependent-path"
+    entityForRequest(RequestBuilding.Delete("/method-dependent-path")) shouldBe "DELETE /method-dependent-path"
+    entityForRequest(Head("/method-dependent-path")) shouldBe "HEAD /method-dependent-path"
+    entityForRequest(Options("/method-dependent-path")) shouldBe "OPTIONS /method-dependent-path"
+    entityForRequest(Post("/decoded-map-entity", encodeJs(Map("a" -> 1, "b" -> "x", "c" -> List(1,2,3)))),
+      decodeJs) shouldBe Map("a" -> 1, "b" -> "x", "c" -> List(1, 2, 3))
+    entityForRequest(Put("/decoded-seq-entity", encodeJs(List(Map("a" -> 1), 2, true, "x", List(1, "y")))),
+      decodeJs) shouldBe List(Map("a" -> 1), 2, true, "x", List(1, "y"))
+    entityForRequest(Put("/decoded-string-entity", HttpEntity("content"))) shouldBe "content"
+    entityForRequest(Post("/decoded-dto-entity", encodeJs(Map("id" -> 1, "name" -> "View1")))) shouldBe "1:View1"
   }
 
   it should "process errors for wabase service routes" in {
     callRoute("/greater/than-3/5") shouldBe "Key: 5"
     callRoute("/greater/than-3/2") shouldBe "Key must be greater then 3, got: 2"
-    callRoute("/greater/than-3/fail") shouldBe """[/greater/than-3/fail] Key must be number instead got: For input string: "fail""""
+    callRoute("/greater/than-3/fail") shouldBe """[GET /greater/than-3/fail] Key must be number instead got: For input string: "fail""""
     callRoute("/key_in_action?code=1") shouldBe "1"
-    callRoute("/key_in_action?code=x") shouldBe """[/key_in_action?code=x] Key must be number instead got: For input string: "x""""
+    callRoute("/key_in_action?code=x") shouldBe """[GET /key_in_action?code=x] Key must be number instead got: For input string: "x""""
   }
 
   it should "do wabase service routes for public views" in {
     callRoute("/public/view1/10", decoder = decodeJs) shouldBe Map("id" -> 10, "value" -> "Value10")
-    callRoute("/public/view1/5", encodeJs(Map("value" -> "Value5-ins")), HttpMethods.POST, decodeJs) shouldBe
+    entityForRequest(Post("/public/view1/5", encodeJs(Map("value" -> "Value5-ins"))), decodeJs) shouldBe
       Map("id" -> 5, "value" -> "Value5-ins")
-    callRoute("/public/view1/5", encodeJs(Map("id" -> 5, "value" -> "Value5-ins")), HttpMethods.PUT,
+    entityForRequest(Put("/public/view1/5", encodeJs(Map("id" -> 5, "value" -> "Value5-ins"))),
       decodeJs) shouldBe Map("id" -> 5, "value" -> "upd-Value5-ins")
-    callRoute("/public/view1/10", method = HttpMethods.DELETE) shouldBe "deleted 10"
+    entityForRequest(RequestBuilding.Delete("/public/view1/10")) shouldBe "deleted 10"
     callRoute("/public/view1?list_filter_param=val", decoder = decodeJs) shouldBe "val"
     callRoute("/public/create:view1?p1=111&p2=aaa", decoder = decodeJs) shouldBe Seq(111, "aaa")
     callRoute("/public/count:view1", decoder = decodeJs) shouldBe 1
@@ -164,6 +164,14 @@ class WabaseServiceSpecs extends AnyFlatSpec with Matchers {
 
     response(Get("/restricted/restricted_view")).status shouldBe StatusCodes.Unauthorized
 
+    // invalid session, throws AuthenticationException with cause, which can be logged in debug mode with
+    // logger in logback-test.xml:
+    // <logger name="get.restricted.restricted_view" level="debug"/>
+    response(
+      authReq("abc", Get("/restricted/restricted_view"))
+    ).status shouldBe StatusCodes.Unauthorized
+
+
     resp = doBasicAuthReq("Gunza", "bad")
     resp.status shouldBe StatusCodes.Unauthorized
 
@@ -178,13 +186,12 @@ class WabaseServiceSpecs extends AnyFlatSpec with Matchers {
     callRoute("/do/dto_handler?id=123&name=ABC", decoder = decodeJs) shouldBe Map("id" -> 123, "name" -> "ABC")
     callRoute("/do/org.wabase.WabaseTestHandlers.dto_seq_handler?id=1&id=2&id=3&name=A&name=B&name=C",
       decoder = decodeJs) shouldBe List(Map("name" -> "A", "id" -> 1), Map("name" -> "B", "id" -> 2), Map("name" -> "C", "id" -> 3))
-    callRoute("/do/test.QuereaseActionJavaManager.java_map_handler", data = encodeJs(Map("a" -> 1, "b" -> "x", "c" -> List(1,2,3))),
-      method = HttpMethods.POST, decoder = decodeJs) shouldBe Map("a" -> 1, "b" -> "x", "c" -> List(1, 2, 3))
-    callRoute("/do/test.QuereaseActionJavaManager.java_seq_handler", data = encodeJs(List(Map("a" -> 1), 2, true, "x", List(1, "y"))),
-      method = HttpMethods.PUT, decoder = decodeJs) shouldBe List(Map("a" -> 1), 2, true, "x", List(1, "y"))
+    entityForRequest(Post("/do/test.QuereaseActionJavaManager.java_map_handler", encodeJs(Map("a" -> 1, "b" -> "x", "c" -> List(1,2,3)))),
+      decodeJs) shouldBe Map("a" -> 1, "b" -> "x", "c" -> List(1, 2, 3))
+    entityForRequest(Put("/do/test.QuereaseActionJavaManager.java_seq_handler", encodeJs(List(Map("a" -> 1), 2, true, "x", List(1, "y")))),
+      decodeJs) shouldBe List(Map("a" -> 1), 2, true, "x", List(1, "y"))
     callRoute("/do/org.wabase.WabaseTestHandlers.optionHandler?key=true") shouldBe "yes"
-    response(Get("/do/org.wabase.WabaseTestHandlers.optionHandler?key=false"))
-      .status shouldBe StatusCodes.NotFound
+    response(Get("/do/org.wabase.WabaseTestHandlers.optionHandler?key=false")).status shouldBe StatusCodes.NotFound
   }
 
   it should "do routes with additional args" in {
@@ -213,16 +220,13 @@ class WabaseServiceSpecs extends AnyFlatSpec with Matchers {
     // borer does not support more than 64 Array/Object nesting levels
     val depth = 30
     val data = deepNestedData(depth)
-    callRoute("/deep-nested-view/nested_view",
-      data = encodeJs(data), method = HttpMethods.POST, decoder = decodeJs) shouldBe data
-    callRoute("/deep-nested-data",
-      data = encodeJs(data), method = HttpMethods.POST, decoder = decodeJs) shouldBe data
+    entityForRequest(Post("/deep-nested-view/nested_view", encodeJs(data)), decodeJs) shouldBe data
+    entityForRequest(Post("/deep-nested-data", encodeJs(data)), decodeJs) shouldBe data
   }
 
   it should "control request size limit" in {
     val uri = "/public/entity_size_limit"
-    callRoute(uri, data = encodeJs(Map("id" -> 1, "name" -> "John")),
-      method = HttpMethods.POST, decoder = decodeJs) shouldBe Map("id" -> 1, "name" -> "John")
+    entityForRequest(Post(uri, encodeJs(Map("id" -> 1, "name" -> "John"))), decodeJs) shouldBe Map("id" -> 1, "name" -> "John")
     val (status, result) = statusAndEntityForRequest(Post(
       uri, encodeJs(Map("id" -> 1, "name" -> "John John John John John John John John John John John John John"))
     ))
@@ -251,7 +255,7 @@ class View1 extends Dto {
 object UserParameterProviderFactory extends AppQuerease.InjectionParametersProviderFactory {
   def createInjectionParametersProvider: AppQuerease.InjectionParametersProvider = ctx => {
     case par if par.getType.isAssignableFrom(classOf[WabaseUser]) =>
-      WabaseUser(ctx.env("current_user").asInstanceOf[Map[String, Any]])
+      WabaseUser(ctx.data("current_user").asInstanceOf[Map[String, Any]])
   }
 }
 

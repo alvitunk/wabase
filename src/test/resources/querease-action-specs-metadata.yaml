@@ -444,7 +444,7 @@ get:
 
 
 name:     env_test_1
-api:      save
+api:      save, list
 table:    person
 auth get: :update_enabled = true
 fields:
@@ -456,6 +456,9 @@ save:
 - name = :current_person_name
 - sex  = 'M'
 - save this
+list:
+- addenv unique { 'AddedName' name, 'M' sex }
+- as env_test_1 this
 
 
 name:         env_test_2
@@ -495,6 +498,22 @@ save:
 - save this
 filter:
 - sex
+
+
+name: env_test_5
+api: get
+get:
+- x = 1
+- addenv if :cond:
+  - x = 2
+  - y = 0
+- else:
+  - y = -1
+  - z = 4
+- addenv if :cond:
+  - a = 9
+  - b = 10
+- this
 
 
 name:     cols_filter_test_1
@@ -705,15 +724,16 @@ fields:
 save:
 - insert this
 - foreach :children :
-    - parent = :'..'.code
+    - parent = :'..'.code  # :'..'.code references outer scope code variable
     - insert this
 - get this
 update:
 - update this
 - foreach :children :
-    - parent = :'..'.code
+    - parent = :'..'.code   # :'..'.code references outer scope code variable
     - update this
 - get this
+
 
 name: foreach_test_2
 extends: foreach_test_1
@@ -721,10 +741,10 @@ api: get, save
 save:
 - insert this
 - if{ :value = 'new' } :
-    - foreach :children :
-       - if { :value = 'new child' } :
-           - parent = :'..'.code  # '..' denotes parent data since curent data is :children.<idx> element
-           - insert this
+  - foreach :children:
+    - if { :value = 'new child' }:
+      - parent = :'..'.'..'.'..'.code   # code three levels up
+      - insert this
 - get this
 
 
@@ -1019,8 +1039,6 @@ get:
 - setenv:res
 - forests = foreach :forests :
   - tree_list = as tree * http { '/tree', '?', :nr nr }
-  - "'..'-="  # remove super data for easier assertion
-  - __idx -=  # remove idx for easier assertion
 
 
 name: not_found_test
@@ -1098,13 +1116,6 @@ get:
 
 name: variable_definition_block_test
 api: get
-fields:
-- a
-- b
-- c:
-  fields:
-  - d
-  - e
 get:
 - res:
   - a = 'a'
@@ -1112,7 +1123,7 @@ get:
   - c:
     - d = 'd'
     - e = 'e'
-- as variable_definition_block_test :res
+- :res
 
 
 name: template_test1
