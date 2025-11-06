@@ -2059,4 +2059,177 @@ components:
     assert(refs.contains("#/components/parameters/MyParam"))
   }
 
+  test("List value in MediaType.example should be handled (via extractAllList)") {
+    val mt = new MediaType()
+    val listExample: java.util.List[String] = List("one", "two", "three").asJava
+    mt.setExample(listExample.asInstanceOf[Object]) // example is Object, array is allowed
+
+    val content = new Content().addMediaType("application/json", mt)
+    val response = new ApiResponse().content(content)
+    val responses = new ApiResponses().addApiResponse("200", response)
+    val operation = new Operation().responses(responses)
+    val pathItem = new PathItem().get(operation)
+
+    val refs = generator.collectRefs(pathItem)
+    assert(refs != null && refs.isEmpty)
+  }
+
+  test("Map value inside Example should be handled (via extractAllMapValues)") {
+    val example = new Example()
+    val mapValue: java.util.Map[String, Object] = Map("k1" -> "v1", "k2" -> 2.asInstanceOf[Object]).asJava
+    example.setValue(mapValue)
+
+    val mt = new MediaType()
+    mt.setExamples(Map("ex1" -> example).asJava)
+
+    val content = new Content().addMediaType("application/json", mt)
+    val response = new ApiResponse().content(content)
+    val responses = new ApiResponses().addApiResponse("200", response)
+    val operation = new Operation().responses(responses)
+    val pathItem = new PathItem().get(operation)
+
+    val refs = generator.collectRefs(pathItem)
+    assert(refs != null && refs.isEmpty)
+  }
+
+  test("MediaType.example as a java.util.List should exercise extractAllList") {
+    val mt = new MediaType()
+
+    // a JSON array is a valid example value
+    val listExample: java.util.List[Object] = List("one", "two", "three").map(_.asInstanceOf[Object]).asJava
+    mt.setExample(listExample.asInstanceOf[Object])
+
+    val content = new Content().addMediaType("application/json", mt)
+    val response = new ApiResponse().content(content)
+    val responses = new ApiResponses().addApiResponse("200", response)
+    val operation = new Operation().responses(responses)
+    val pathItem = new PathItem().get(operation)
+
+    // should not throw and should return the expected refs (usually empty when no $ref present)
+    val refs = generator.collectRefs(pathItem)
+    assert(refs != null && refs.isEmpty)
+  }
+
+  test("Example.value as a java.util.Map should exercise extractAllMapValues") {
+    val example = new Example()
+
+    // a JSON object is a valid example value
+    val mapValue: java.util.Map[String, Object] =
+      Map("a" -> "x", "b" -> 2.asInstanceOf[Object]).asJava
+    example.setValue(mapValue)
+
+    val mt = new MediaType()
+    mt.setExamples(Map("ex1" -> example).asJava)
+
+    val content = new Content().addMediaType("application/json", mt)
+    val response = new ApiResponse().content(content)
+    val responses = new ApiResponses().addApiResponse("200", response)
+    val operation = new Operation().responses(responses)
+    val pathItem = new PathItem().get(operation)
+
+    val refs = generator.collectRefs(pathItem)
+    assert(refs != null && refs.isEmpty)
+  }
+
+  test("MediaType.example as a java.util.List should exercise case l only if explicitly instructed (why?)") {
+    val mt = new MediaType()
+    val listExample: java.util.List[Object] = List("one", "two", "three").map(_.asInstanceOf[Object]).asJava
+    mt.setExample(listExample.asInstanceOf[Object])
+
+    val content = new Content().addMediaType("application/json", mt)
+    val response = new ApiResponse().content(content)
+    val responses = new ApiResponses().addApiResponse("200", response)
+    val operation = new Operation().responses(responses)
+    val pathItem = new PathItem().get(operation)
+
+    val refs = generator.collectRefs(pathItem)
+    assert(refs != null && refs.isEmpty)
+  }
+
+  test("Example.value as a java.util.Map should exercise case m only if explicitly instructed (why?)") {
+    val example = new Example()
+    val mapValue: java.util.Map[String, Object] =
+      Map("a" -> "x", "b" -> 2.asInstanceOf[Object]).asJava
+    example.setValue(mapValue)
+
+    val mt = new MediaType()
+    mt.setExamples(Map("ex1" -> example).asJava)
+
+    val content = new Content().addMediaType("application/json", mt)
+    val response = new ApiResponse().content(content)
+    val responses = new ApiResponses().addApiResponse("200", response)
+    val operation = new Operation().responses(responses)
+    val pathItem = new PathItem().get(operation)
+
+    val refs = generator.collectRefs(pathItem)
+    assert(refs != null && refs.isEmpty)
+  }
+
+  test("primitive Example.value should hit default case") {
+    val example = new Example()
+    example.setValue("just-a-string")
+
+    val mt = new MediaType()
+    mt.setExamples(Map("ex1" -> example).asJava)
+
+    val content = new Content().addMediaType("application/json", mt)
+    val response = new ApiResponse().content(content)
+    val responses = new ApiResponses().addApiResponse("200", response)
+    val operation = new Operation().responses(responses)
+    val pathItem = new PathItem().get(operation)
+
+    val refs = generator.collectRefs(pathItem)
+    assert(refs != null && refs.isEmpty)
+  }
+
+  test("primitive MediaType.example should hit default case") {
+    val mt = new MediaType()
+    mt.setExample(Integer.valueOf(42).asInstanceOf[Object])
+
+    val content = new Content().addMediaType("application/json", mt)
+    val response = new ApiResponse().content(content)
+    val responses = new ApiResponses().addApiResponse("200", response)
+    val operation = new Operation().responses(responses)
+    val pathItem = new PathItem().get(operation)
+
+    val refs = generator.collectRefs(pathItem)
+    assert(refs != null && refs.isEmpty)
+  }
+
+  test("Example entry that is a Reference Object should be discovered") {
+    // Example that is itself a Reference Object (Example.get$ref)
+    val refExample = new Example()
+    refExample.set$ref("#/components/schemas/Foo")
+
+    val mt = new MediaType()
+    mt.setExamples(Map("ex1" -> refExample).asJava)
+
+    val content = new Content().addMediaType("application/json", mt)
+    val response = new ApiResponse().content(content)
+    val responses = new ApiResponses().addApiResponse("200", response)
+    val operation = new Operation().responses(responses)
+    val pathItem = new PathItem().get(operation)
+
+    val refs = generator.collectRefs(pathItem)
+    assert(refs != null && refs.contains("#/components/schemas/Foo"))
+  }
+
+  test("Example.value containing a plain map with $ref key should NOT be treated as a spec ref") {
+    // Example.value holds free-form data: a plain JSON object with a "$ref" key is just data per spec.
+    val example = new Example()
+    example.setValue(Map("$ref" -> "#/components/schemas/Bar").asJava)
+
+    val mt = new MediaType()
+    mt.setExamples(Map("ex1" -> example).asJava)
+
+    val content = new Content().addMediaType("application/json", mt)
+    val response = new ApiResponse().content(content)
+    val responses = new ApiResponses().addApiResponse("200", response)
+    val operation = new Operation().responses(responses)
+    val pathItem = new PathItem().get(operation)
+
+    val refs = generator.collectRefs(pathItem)
+    assert(refs != null && !refs.contains("#/components/schemas/Bar"))
+  }
+
 }

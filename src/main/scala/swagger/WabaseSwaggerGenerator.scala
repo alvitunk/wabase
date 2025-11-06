@@ -836,6 +836,7 @@ class WabaseSwaggerGenerator(
 
       case mt: MediaType =>
         extractRefs(mt.getSchema, refs, visited)
+        // extractRefs(mt.getExample, refs, visited)  //why traverse singular example value?
         extractAllMapValues(mt.getExamples, refs, visited)
         extractAllMapValues(mt.getEncoding, refs, visited)
 
@@ -868,17 +869,22 @@ class WabaseSwaggerGenerator(
 
       case example: Example =>
         addRef(example.get$ref)
+        //extractRefs(example.getValue, refs, visited) //why traverse example.value?
 
       case callback: Callback =>
         extractAll(callback.values().asScala, refs, visited)
 
-      case l: java.util.List[_] =>
+      /*case l: java.util.List[_] =>
         extractAllList(l, refs, visited)
 
       case m: java.util.Map[_, _] =>
         extractAllMapValues(m, refs, visited)
+      // Simplify
+      // raw java.util.List and java.util.Map cases removed:
+      // unreachable from collectRefs(pathItem) given current traversal rules
+      */
 
-      case _ =>
+      case _ => //ignored
     }
   }
 
