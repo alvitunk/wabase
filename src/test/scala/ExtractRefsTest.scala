@@ -1934,50 +1934,75 @@ components:
     assert(generator.collectRefs(pathItem).isEmpty)
   }
 
-  test("Null in Schema.getItems should cause failure if not guarded") {
+  test("Null Schema.getItems should be treated as absent and not cause failure") {
     val schema = new Schema[Object]()
     schema.setItems(null)
     val param = new Parameter().schema(schema)
     val pathItem = new PathItem().parameters(List(param).asJava)
-    generator.collectRefs(pathItem)
+    val refs = generator.collectRefs(pathItem)
+    assert(refs != null && refs.isEmpty)
   }
 
-  test("String in MediaType.getExamples should cause failure") {
+
+  test("Non-Example value in MediaType.examples should be ignored and not cause failure") {
     val mt = new MediaType()
-    mt.setExamples(Map("bad" -> "not-an-example").asJava.asInstanceOf[java.util.Map[String, Example]])
+    val raw: java.util.Map[String, Object] =
+      Map("good" -> new Example().summary("ok"), "bad" -> "not-an-example").asJava
+    mt.setExamples(raw.asInstanceOf[java.util.Map[String, Example]])
     val content = new Content().addMediaType("application/json", mt)
     val response = new ApiResponse().content(content)
     val responses = new ApiResponses().addApiResponse("200", response)
     val operation = new Operation().responses(responses)
     val pathItem = new PathItem().get(operation)
-    generator.collectRefs(pathItem)
+
+    val refs = generator.collectRefs(pathItem)
+    assert(refs != null)
+    assert(refs.isEmpty)
   }
 
-  test("Boolean in ApiResponse.getHeaders should cause failure") {
+
+  test("Non-Header value in ApiResponse.headers should be ignored and not cause failure") {
     val response = new ApiResponse()
-    response.setHeaders(Map("bad" -> java.lang.Boolean.FALSE).asJava.asInstanceOf[java.util.Map[String, Header]])
+    // construct a raw map containing a bad value, then cast only for constructing an intentionally-bad input
+    val raw: java.util.Map[String, Object] = Map("good" -> new Header().description("h"), "bad" -> java.lang.Boolean.FALSE).asJava
+    response.setHeaders(raw.asInstanceOf[java.util.Map[String, Header]])
+
     val responses = new ApiResponses().addApiResponse("200", response)
     val operation = new Operation().responses(responses)
     val pathItem = new PathItem().get(operation)
-    generator.collectRefs(pathItem)
+
+    val refs = generator.collectRefs(pathItem)
+    assert(refs != null)
+    assert(refs.isEmpty)
   }
 
-  test("Null PathItem.getGet should cause failure if not guarded") {
+
+  test("Null PathItem.get should be treated as empty and not cause failure") {
     val pathItem = new PathItem().get(null)
-    generator.collectRefs(pathItem)
+    val refs = generator.collectRefs(pathItem)
+    assert(refs != null)
+    assert(refs.isEmpty)
   }
 
-  test("Empty Operation.getCallbacks should cause failure if not null-checked") {
+
+  test("Empty Operation.getCallbacks should be treated as empty and not cause failure") {
     val operation = new Operation().callbacks(Map.empty[String, Callback].asJava)
     val pathItem = new PathItem().get(operation)
-    generator.collectRefs(pathItem)
+    val refs = generator.collectRefs(pathItem)
+    assert(refs != null)
+    assert(refs.isEmpty)
   }
 
-  test("Primitive in JList should cause failure") {
+
+  test("Primitive in servers list should be ignored and not cause failure") {
     val pathItem = new PathItem()
-    pathItem.setServers(List(new Server().url("https://api.example.com"), java.lang.Boolean.TRUE).asJava.asInstanceOf[java.util.List[Server]])
-    generator.collectRefs(pathItem)
+    val rawList: java.util.List[AnyRef] = List(new Server().url("https://api.example.com"), java.lang.Boolean.TRUE).asJava
+    pathItem.setServers(rawList.asInstanceOf[java.util.List[Server]])
+    val refs = generator.collectRefs(pathItem)
+    assert(refs != null)
+    assert(refs.isEmpty)
   }
+
 
   // expect during runtime java.lang.ClassCastException:
   // class java.lang.Boolean cannot be cast to class io.swagger.v3.oas.models.PathItem
@@ -1992,13 +2017,15 @@ components:
     }
   }
 
-  test("Null Schema.getProperties should cause failure if not guarded") {
+  test("Null Schema.getProperties should be treated as empty - no failure") {
     val schema = new Schema[Object]()
     schema.setProperties(null)
     val param = new Parameter().schema(schema)
     val pathItem = new PathItem().parameters(List(param).asJava)
-    generator.collectRefs(pathItem)
+    val refs = generator.collectRefs(pathItem)
+    assert(refs.isEmpty)
   }
+
 
   test("Valid $ref in Link, Header, Example, RequestBody, Parameter should be extracted") {
     val link = new Link().$ref("#/components/links/MyLink")
