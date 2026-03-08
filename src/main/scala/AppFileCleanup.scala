@@ -179,12 +179,14 @@ class AppFileCleanup(dbAccess: DbAccess, fileStreamers: AppFileStreamerConfig*) 
       if tableRef.refTable == fs.file_info_table
     } yield (tableDef.name, tableRef.cols.head)).toSet -- refsToIgnore
 
-    val joinsAndTables = tableMetadataWithFileInfo.zipWithIndex.map {
-      case ((table, col), idx) => (s"fi [t$idx.$col = fi.id] $table t$idx ?", s"t$idx.$col")
+    val existsNotFilters = tableMetadataWithFileInfo.map {
+      case (table, col) => s"!exists($table[$col = fi.id])"
     }
     val selectStatement =
-      s"${fs.file_info_table} fi" + joinsAndTables.map("; " + _._1).mkString +
-        s"""[fi.upload_time < sql("$ageCheckSql") """ + joinsAndTables.map(" & " + _._2 + " = null").mkString + "]{fi.id}"
+      s"${fs.file_info_table} fi" +
+        s"""[fi.upload_time < sql("$ageCheckSql")""" +
+        existsNotFilters.map(" & " + _).mkString +
+        "]{fi.id}"
     selectStatement
   }
 
